@@ -1,187 +1,213 @@
-#pragma once
+#ifndef __GEOMETRY_H__
+#define __GEOMETRY_H__
 #include <cmath>
+#include <vector>
 #include <cassert>
 #include <iostream>
 
-template<int n> struct vec {
-    double data[n] = {0};
-    double& operator[](const int i)       { assert(i>=0 && i<n); return data[i]; }
-    double  operator[](const int i) const { assert(i>=0 && i<n); return data[i]; }
+// Forward declaration for dt structure used in mat class
+template<size_t DIM, typename T> struct dt;
+
+template <size_t DimCols, size_t DimRows, typename T> class mat;
+
+template <size_t DIM, typename T> struct vec {
+    vec() { for (size_t i = DIM; i--; data_[i] = T()); }
+    T& operator[](const size_t i) { assert(i < DIM); return data_[i]; }
+    const T& operator[](const size_t i) const { assert(i < DIM); return data_[i]; }
+private:
+    T data_[DIM];
 };
 
-template<int n> double operator*(const vec<n>& lhs, const vec<n>& rhs) {
-    double ret = 0;                         // N.B. Do not ever, ever use such for loops! They are highly confusing.
-    for (int i=n; i--; ret+=lhs[i]*rhs[i]); // Here I used them as a tribute to old-school game programmers fighting for every CPU cycle.
-    return ret;                             // Once upon a time reverse loops were faster than the normal ones, it is not the case anymore.
-}
+typedef vec<2, float> vec2;
+typedef vec<3, float> vec3;
+typedef vec<4, float> vec4;
 
-template<int n> vec<n> operator+(const vec<n>& lhs, const vec<n>& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]+=rhs[i]);
+template <typename T> struct vec<2, T> {
+    vec() : x(T()), y(T()) {}
+    vec(T X, T Y) : x(X), y(Y) {}
+    template <class U> vec(const vec<2, U>& v) : x((T)v.x), y((T)v.y) {}
+    T& operator[](const size_t i) { assert(i < 2); return i <= 0 ? x : y; }
+    const T& operator[](const size_t i) const { assert(i < 2); return i <= 0 ? x : y; }
+    T x, y;
+};
+
+template <typename T> struct vec<3, T> {
+    vec() : x(T()), y(T()), z(T()) {}
+    vec(T X, T Y, T Z) : x(X), y(Y), z(Z) {}
+    template <class U> vec(const vec<3, U>& v) : x((T)v.x), y((T)v.y), z((T)v.z) {}
+    T& operator[](const size_t i) { assert(i < 3); return i <= 0 ? x : (1 == i ? y : z); }
+    const T& operator[](const size_t i) const { assert(i < 3); return i <= 0 ? x : (1 == i ? y : z); }
+    float norm() { return std::sqrt(x * x + y * y + z * z); }
+    vec<3, T>& normalize(T l = 1) { *this = (*this) * (l / norm()); return *this; }
+    T x, y, z;
+};
+
+template <typename T> struct vec<4, T> {
+    vec() : x(T()), y(T()), z(T()), w(T()) {}
+    vec(T X, T Y, T Z, T W) : x(X), y(Y), z(Z), w(W) {}
+    template <class U> vec(const vec<4, U>& v) : x((T)v.x), y((T)v.y), z((T)v.z), w((T)v.w) {}
+    T& operator[](const size_t i) { assert(i < 4); return i <= 0 ? x : (1 == i ? y : (2 == i ? z : w)); }
+    const T& operator[](const size_t i) const { assert(i < 4); return i <= 0 ? x : (1 == i ? y : (2 == i ? z : w)); }
+    T x, y, z, w;
+};
+
+template<size_t DIM, typename T> T operator*(const vec<DIM, T>& lhs, const vec<DIM, T>& rhs) {
+    T ret = T();
+    for (size_t i = DIM; i--; ret += lhs[i] * rhs[i]);
     return ret;
 }
 
-template<int n> vec<n> operator-(const vec<n>& lhs, const vec<n>& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]-=rhs[i]);
+template<size_t DIM, typename T> vec<DIM, T> operator+(vec<DIM, T> lhs, const vec<DIM, T>& rhs) {
+    for (size_t i = DIM; i--; lhs[i] += rhs[i]);
+    return lhs;
+}
+
+template<size_t DIM, typename T> vec<DIM, T> operator-(vec<DIM, T> lhs, const vec<DIM, T>& rhs) {
+    for (size_t i = DIM; i--; lhs[i] -= rhs[i]);
+    return lhs;
+}
+
+template<size_t DIM, typename T, typename U> vec<DIM, T> operator*(vec<DIM, T> lhs, const U& rhs) {
+    for (size_t i = DIM; i--; lhs[i] = (T)(lhs[i] * rhs));
+    return lhs;
+}
+
+template<size_t DIM, typename T, typename U> vec<DIM, T> operator/(vec<DIM, T> lhs, const U& rhs) {
+    for (size_t i = DIM; i--; lhs[i] = (T)(lhs[i] / rhs));
+    return lhs;
+}
+
+template<size_t LEN, size_t DIM, typename T> vec<LEN, T> embed(const vec<DIM, T>& v, T fill = 1) {
+    vec<LEN, T> ret;
+    for (size_t i = LEN; i--; ret[i] = (i < DIM ? v[i] : fill));
     return ret;
 }
 
-template<int n> vec<n> operator*(const vec<n>& lhs, const double& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]*=rhs);
+template<size_t LEN, size_t DIM, typename T> vec<LEN, T> proj(const vec<DIM, T>& v) {
+    vec<LEN, T> ret;
+    for (size_t i = LEN; i--; ret[i] = v[i]);
     return ret;
 }
 
-template<int n> vec<n> operator*(const double& lhs, const vec<n> &rhs) {
-    return rhs * lhs;
+template <typename T> vec<3, T> cross(vec<3, T> v1, vec<3, T> v2) {
+    return vec<3, T>(v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x);
 }
 
-template<int n> vec<n> operator/(const vec<n>& lhs, const double& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]/=rhs);
-    return ret;
-}
-
-template<int n> std::ostream& operator<<(std::ostream& out, const vec<n>& v) {
-    for (int i=0; i<n; i++) out << v[i] << " ";
+template <size_t DIM, typename T> std::ostream& operator<<(std::ostream& out, vec<DIM, T>& v) {
+    for (unsigned int i = 0; i < DIM; i++) {
+        out << v[i] << " ";
+    }
     return out;
 }
 
-template<> struct vec<2> {
-    double x = 0, y = 0;
-    double& operator[](const int i)       { assert(i>=0 && i<2); return i ? y : x; }
-    double  operator[](const int i) const { assert(i>=0 && i<2); return i ? y : x; }
-};
+/////////////////////////////////////////////////////////////////////////////////
 
-template<> struct vec<3> {
-    double x = 0, y = 0, z = 0;
-    double& operator[](const int i)       { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }
-    double  operator[](const int i) const { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }
-};
+template<size_t DimRows, size_t DimCols, typename T> class mat {
+    vec<DimCols, T> rows[DimRows];
+public:
+    mat() {}
 
-template<> struct vec<4> {
-    double x = 0, y = 0, z = 0, w = 0;
-    double& operator[](const int i)       { assert(i>=0 && i<4); return i<2 ? (i ? y : x) : (2==i ? z : w); }
-    double  operator[](const int i) const { assert(i>=0 && i<4); return i<2 ? (i ? y : x) : (2==i ? z : w); }
-    vec<2> xy()  const { return {x, y};    }
-    vec<3> xyz() const { return {x, y, z}; }
-};
+    vec<DimCols, T>& operator[](const size_t i) { assert(i < DimRows); return rows[i]; }
+    const vec<DimCols, T>& operator[](const size_t i) const { assert(i < DimRows); return rows[i]; }
 
-typedef vec<2> vec2;
-typedef vec<3> vec3;
-typedef vec<4> vec4;
-
-template<int n> double norm(const vec<n>& v) {
-    return std::sqrt(v*v);
-}
-
-template<int n> vec<n> normalized(const vec<n>& v) {
-    return v / norm(v);
-}
-
-inline vec3 cross(const vec3 &v1, const vec3 &v2) {
-    return {v1.y*v2.z - v1.z*v2.y, v1.z*v2.x - v1.x*v2.z, v1.x*v2.y - v1.y*v2.x};
-}
-
-template<int n> struct dt;
-
-template<int nrows,int ncols> struct mat {
-    vec<ncols> rows[nrows] = {{}};
-
-          vec<ncols>& operator[] (const int idx)       { assert(idx>=0 && idx<nrows); return rows[idx]; }
-    const vec<ncols>& operator[] (const int idx) const { assert(idx>=0 && idx<nrows); return rows[idx]; }
-
-    double det() const {
-        return dt<ncols>::det(*this);
-    }
-
-    double cofactor(const int row, const int col) const {
-        mat<nrows-1,ncols-1> submatrix;
-        for (int i=nrows-1; i--; )
-            for (int j=ncols-1;j--; submatrix[i][j]=rows[i+int(i>=row)][j+int(j>=col)]);
-        return submatrix.det() * ((row+col)%2 ? -1 : 1);
-    }
-
-    mat<nrows,ncols> invert_transpose() const {
-        mat<nrows,ncols> adjugate_transpose; // transpose to ease determinant computation, check the last line
-        for (int i=nrows; i--; )
-            for (int j=ncols; j--; adjugate_transpose[i][j]=cofactor(i,j));
-        return adjugate_transpose/(adjugate_transpose[0]*rows[0]);
-    }
-
-    mat<nrows,ncols> invert() const {
-        return invert_transpose().transpose();
-    }
-
-    mat<ncols,nrows> transpose() const {
-        mat<ncols,nrows> ret;
-        for (int i=ncols; i--; )
-            for (int j=nrows; j--; ret[i][j]=rows[j][i]);
+    vec<DimRows, T> col(const size_t i) const {
+        assert(i < DimCols);
+        vec<DimRows, T> ret;
+        for (size_t j = DimRows; j--; ret[j] = rows[j][i]);
         return ret;
     }
-};
 
-template<int nrows,int ncols> vec<ncols> operator*(const vec<nrows>& lhs, const mat<nrows,ncols>& rhs) {
-    return (mat<1,nrows>{{lhs}}*rhs)[0];
-}
+    void set_col(size_t i, vec<DimRows, T> v) {
+        assert(i < DimCols);
+        for (size_t j = DimRows; j--; rows[j][i] = v[j]);
+    }
 
-template<int nrows,int ncols> vec<nrows> operator*(const mat<nrows,ncols>& lhs, const vec<ncols>& rhs) {
-    vec<nrows> ret;
-    for (int i=nrows; i--; ret[i]=lhs[i]*rhs);
-    return ret;
-}
-
-template<int R1,int C1,int C2>mat<R1,C2> operator*(const mat<R1,C1>& lhs, const mat<C1,C2>& rhs) {
-    mat<R1,C2> result;
-    for (int i=R1; i--; )
-        for (int j=C2; j--; )
-            for (int k=C1; k--; result[i][j]+=lhs[i][k]*rhs[k][j]);
-    return result;
-}
-
-template<int nrows,int ncols>mat<nrows,ncols> operator*(const mat<nrows,ncols>& lhs, const double& val) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; result[i] = lhs[i]*val);
-    return result;
-}
-
-template<int nrows,int ncols>mat<nrows,ncols> operator/(const mat<nrows,ncols>& lhs, const double& val) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; result[i] = lhs[i]/val);
-    return result;
-}
-
-template<int nrows,int ncols>mat<nrows,ncols> operator+(const mat<nrows,ncols>& lhs, const mat<nrows,ncols>& rhs) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; )
-        for (int j=ncols; j--; result[i][j]=lhs[i][j]+rhs[i][j]);
-    return result;
-}
-
-template<int nrows,int ncols>mat<nrows,ncols> operator-(const mat<nrows,ncols>& lhs, const mat<nrows,ncols>& rhs) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; )
-        for (int j=ncols; j--; result[i][j]=lhs[i][j]-rhs[i][j]);
-    return result;
-}
-
-template<int nrows,int ncols> std::ostream& operator<<(std::ostream& out, const mat<nrows,ncols>& m) {
-    for (int i=0; i<nrows; i++) out << m[i] << std::endl;
-    return out;
-}
-
-template<int n> struct dt { // template metaprogramming to compute the determinant recursively
-    static double det(const mat<n,n>& src) {
-        double ret = 0;
-        for (int i=n; i--; ret += src[0][i] * src.cofactor(0,i));
+    static mat<DimRows, DimCols, T> identity() {
+        mat<DimRows, DimCols, T> ret;
+        for (size_t i = DimRows; i--; )
+            for (size_t j = DimCols; j--; ret[i][j] = (i == j));
         return ret;
+    }
+
+    T det() const {
+        return dt<DimCols, T>::det(*this);
+    }
+
+    mat<DimRows, DimCols, T> invert() const {
+        return dt<DimCols, T>::invert(*this);
+    }
+
+    mat<DimCols, DimRows, T> transpose() const {
+        mat<DimCols, DimRows, T> ret;
+        for (size_t i = DimCols; i--; ret[i] = this->col(i));
+        return ret;
+    }
+
+    mat<DimRows - 1, DimCols - 1, T> get_minor(size_t row, size_t col) const {
+        mat<DimRows - 1, DimCols - 1, T> ret;
+        for (size_t i = DimRows - 1; i--; )
+            for (size_t j = DimCols - 1; j--; )
+                ret[i][j] = rows[i < row ? i : i + 1][j < col ? j : j + 1];
+        return ret;
+    }
+
+    T cofactor(size_t row, size_t col) const {
+        return get_minor(row, col).det() * ((row + col) % 2 ? -1 : 1);
     }
 };
 
-template<> struct dt<1> {   // template specialization to stop the recursion
-    static double det(const mat<1,1>& src) {
+template<size_t DIM, typename T> struct dt {
+    static T det(const mat<DIM, DIM, T>& src) {
+        T ret = 0;
+        for (size_t i = DIM; i--; ret += src[0][i] * src.cofactor(0, i));
+        return ret;
+    }
+
+    static mat<DIM, DIM, T> invert(const mat<DIM, DIM, T>& src) {
+        mat<DIM, DIM, T> ret;
+        T determinant = src.det();
+        for (size_t i = DIM; i--; )
+            for (size_t j = DIM; j--; ret[i][j] = src.cofactor(i, j) / determinant);
+        return ret.transpose();
+    }
+};
+
+template<typename T> struct dt<1, T> {
+    static T det(const mat<1, 1, T>& src) {
         return src[0][0];
     }
+
+    static mat<1, 1, T> invert(const mat<1, 1, T>& src) {
+        mat<1, 1, T> ret;
+        ret[0][0] = (T)1 / src[0][0];
+        return ret;
+    }
 };
 
+template<size_t DimRows, size_t DimCols, typename T> vec<DimRows, T> operator*(const mat<DimRows, DimCols, T>& lhs, const vec<DimCols, T>& rhs) {
+    vec<DimRows, T> ret;
+    for (size_t i = DimRows; i--; ret[i] = lhs[i] * rhs);
+    return ret;
+}
+
+template<size_t R1, size_t C1, size_t C2, typename T>mat<R1, C2, T> operator*(const mat<R1, C1, T>& lhs, const mat<C1, C2, T>& rhs) {
+    mat<R1, C2, T> result;
+    for (size_t i = R1; i--; )
+        for (size_t j = C2; j--; result[i][j] = lhs[i] * rhs.col(j));
+    return result;
+}
+
+template<size_t DimRows, size_t DimCols, typename T>mat<DimCols, DimRows, T> operator/(mat<DimRows, DimCols, T> lhs, const T& rhs) {
+    for (size_t i = DimRows; i--; lhs[i] = lhs[i] / rhs);
+    return lhs;
+}
+
+template <size_t DimRows, size_t DimCols, typename T> std::ostream& operator<<(std::ostream& out, mat<DimRows, DimCols, T>& m) {
+    for (size_t i = 0; i < DimRows; i++) out << m[i] << std::endl;
+    return out;
+}
+
+typedef mat<4, 4, float> Matrix;
+typedef mat<3, 3, float> Matrix3x3;
+
+#endif //__GEOMETRY_H__
